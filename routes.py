@@ -9,7 +9,13 @@ logger = logging.getLogger(__name__)
 
 @app.route('/')
 def index():
-    """Main landing page for WeatherAvatar"""
+    """Splash screen landing page for WeatherAvatar"""
+    return render_template('splash.html', title='Welcome to WeatherAvatar')
+
+
+@app.route('/dashboard')
+def dashboard():
+    """Main dashboard page for WeatherAvatar"""
     return render_template('index.html', title='WeatherAvatar')
 
 
