@@ -1,4 +1,5 @@
-from flask import render_template, request, jsonify, flash, redirect, url_for
+from flask import render_template, request, jsonify, flash, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from app import app, db
 from models import User, WeatherData, Avatar
 import logging
@@ -17,6 +18,74 @@ def index():
 def dashboard():
     """Main dashboard page for WeatherAvatar"""
     return render_template('index.html', title='WeatherAvatar')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login and signup route"""
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Validate required fields
+        if not email or not password:
+            flash('Email and password are required.', 'error')
+            return render_template('login.html', title='Login - WeatherAvatar')
+        
+        if form_type == 'login':
+            # Handle login
+            user = User.query.filter_by(email=email).first()
+            if user and user.password_hash and check_password_hash(user.password_hash, password):
+                session['user_id'] = user.id
+                session['user_email'] = user.email
+                flash('Login successful!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Invalid email or password.', 'error')
+        
+        elif form_type == 'signup':
+            # Handle signup
+            confirm_password = request.form.get('confirm_password')
+            
+            if not confirm_password:
+                flash('Please confirm your password.', 'error')
+            elif password != confirm_password:
+                flash('Passwords do not match.', 'error')
+            elif User.query.filter_by(email=email).first():
+                flash('Email already registered.', 'error')
+            else:
+                # Create new user
+                username = email.split('@')[0] if '@' in email else email
+                password_hash = generate_password_hash(password)
+                
+                new_user = User()
+                new_user.username = username
+                new_user.email = email
+                new_user.password_hash = password_hash
+                
+                try:
+                    db.session.add(new_user)
+                    db.session.commit()
+                    
+                    session['user_id'] = new_user.id
+                    session['user_email'] = new_user.email
+                    flash('Account created successfully!', 'success')
+                    return redirect(url_for('dashboard'))
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f'Error creating user: {e}')
+                    flash('Error creating account. Please try again.', 'error')
+    
+    return render_template('login.html', title='Login - WeatherAvatar')
+
+
+@app.route('/logout')
+def logout():
+    """Logout route"""
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
 
 
 @app.route('/mockups')
