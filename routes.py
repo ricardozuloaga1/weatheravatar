@@ -143,7 +143,7 @@ def profile():
         try:
             db.session.commit()
             flash('Profile saved successfully!', 'success')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('avatar_preview'))
         except Exception as e:
             db.session.rollback()
             logger.error(f'Error saving profile: {e}')
@@ -167,11 +167,28 @@ def weather():
 
 
 @app.route('/avatar')
-def avatar():
-    """Avatar customization route - will be implemented based on mockups"""
-    # This route will be expanded based on UI mockups
-    avatars = Avatar.query.all()
-    return render_template('avatar.html', avatars=avatars, title='Avatar - WeatherAvatar')
+def avatar_preview():
+    """Avatar preview route"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to view your avatar.', 'error')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('login'))
+    
+    # Get user profile
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    
+    if not profile:
+        flash('Please create your profile first.', 'info')
+        return redirect(url_for('profile'))
+    
+    return render_template('avatar.html', profile=profile, title='Your Avatar - WeatherAvatar')
 
 
 @app.route('/api/weather/<location>')
