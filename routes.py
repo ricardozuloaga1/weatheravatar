@@ -4,6 +4,8 @@ from app import app, db
 from models import User, WeatherData, Avatar, UserProfile
 import logging
 import os
+import requests
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -160,10 +162,13 @@ def mockups():
 
 @app.route('/weather')
 def weather():
-    """Weather data display route - will be implemented based on mockups"""
-    # This route will be expanded based on UI mockups
-    weather_data = WeatherData.query.order_by(WeatherData.timestamp.desc()).limit(10).all()
-    return render_template('weather.html', weather_data=weather_data, title='Weather - WeatherAvatar')
+    """Weather selection and display route"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to view weather.', 'error')
+        return redirect(url_for('login'))
+    
+    return render_template('weather.html', title='Your Weather - WeatherAvatar')
 
 
 @app.route('/avatar')
@@ -191,16 +196,117 @@ def avatar_preview():
     return render_template('avatar.html', profile=profile, title='Your Avatar - WeatherAvatar')
 
 
-@app.route('/api/weather/<location>')
-def api_weather(location):
-    """API endpoint for weather data - placeholder for future implementation"""
-    # This will be implemented to fetch real weather data
-    # For now, return a structured response for frontend development
-    return jsonify({
-        'location': location,
-        'status': 'placeholder',
-        'message': 'Weather API integration will be implemented based on UI requirements'
-    })
+def get_weather_data(lat, lon, location_name=None):
+    """Fetch weather data from OpenWeatherMap API"""
+    try:
+        api_key = os.environ.get('OPENWEATHER_API_KEY')
+        if not api_key:
+            raise Exception('Weather API key not configured')
+        
+        url = f"https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'appid': api_key,
+            'units': 'imperial'  # Use Fahrenheit
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Save weather data to database
+        weather_record = WeatherData()
+        weather_record.location = location_name or f"{lat},{lon}"
+        weather_record.temperature = data['main']['temp']
+        weather_record.description = data['weather'][0]['description'].title()
+        weather_record.humidity = data['main']['humidity']
+        weather_record.wind_speed = data['wind'].get('speed', 0)
+        
+        try:
+            db.session.add(weather_record)
+            db.session.commit()
+        except Exception as e:
+            logger.warning(f'Could not save weather data: {e}')
+            db.session.rollback()
+        
+        return {
+            'location': location_name or data.get('name', 'Unknown'),
+            'temperature': round(data['main']['temp']),
+            'description': data['weather'][0]['description'].title(),
+            'humidity': data['main']['humidity'],
+            'wind_speed': data['wind'].get('speed', 0),
+            'icon': data['weather'][0]['icon']
+        }
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f'Weather API request failed: {e}')
+        raise Exception('Unable to fetch weather data')
+    except Exception as e:
+        logger.error(f'Weather data processing failed: {e}')
+        raise Exception('Weather service temporarily unavailable')
+
+
+@app.route('/api/weather/coords/<float:lat>/<float:lon>')
+def api_weather_coords(lat, lon):
+    """API endpoint for weather data by coordinates"""
+    try:
+        weather_data = get_weather_data(lat, lon)
+        return jsonify(weather_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/weather/city/<city>')
+def api_weather_city(city):
+    """API endpoint for weather data by city name"""
+    try:
+        api_key = os.environ.get('OPENWEATHER_API_KEY')
+        if not api_key:
+            return jsonify({'error': 'Weather API key not configured'}), 500
+        
+        # First get coordinates for the city
+        geocoding_url = f"https://api.openweathermap.org/geo/1.0/direct"
+        geocoding_params = {
+            'q': city,
+            'limit': 1,
+            'appid': api_key
+        }
+        
+        geo_response = requests.get(geocoding_url, params=geocoding_params, timeout=10)
+        geo_response.raise_for_status()
+        
+        geo_data = geo_response.json()
+        if not geo_data:
+            return jsonify({'error': 'City not found'}), 404
+        
+        lat = geo_data[0]['lat']
+        lon = geo_data[0]['lon']
+        location_name = f"{geo_data[0]['name']}, {geo_data[0].get('country', '')}"
+        
+        weather_data = get_weather_data(lat, lon, location_name)
+        return jsonify(weather_data)
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f'Weather API request failed: {e}')
+        return jsonify({'error': 'Unable to fetch weather data'}), 400
+    except Exception as e:
+        logger.error(f'Weather API error: {e}')
+        return jsonify({'error': 'Weather service temporarily unavailable'}), 500
+
+
+@app.route('/outfit')
+def outfit():
+    """Outfit recommendation route - placeholder for future mockup implementation"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to view outfit recommendations.', 'error')
+        return redirect(url_for('login'))
+    
+    # For now, redirect to dashboard
+    flash('Outfit recommendations coming soon!', 'info')
+    return redirect(url_for('dashboard'))
 
 
 @app.errorhandler(404)
