@@ -1,7 +1,7 @@
 from flask import render_template, request, jsonify, flash, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import app, db
-from models import User, WeatherData, Avatar
+from models import User, WeatherData, Avatar, UserProfile
 import logging
 import os
 
@@ -70,8 +70,8 @@ def login():
                     
                     session['user_id'] = new_user.id
                     session['user_email'] = new_user.email
-                    flash('Account created successfully!', 'success')
-                    return redirect(url_for('dashboard'))
+                    flash('Account created successfully! Please complete your profile.', 'success')
+                    return redirect(url_for('profile'))
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f'Error creating user: {e}')
@@ -86,6 +86,70 @@ def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+def profile():
+    """Profile creation and editing route"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to create your profile.', 'error')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        height = request.form.get('height')
+        gender = request.form.get('gender')
+        body_type = request.form.get('body_type')
+        
+        # Validate required fields
+        if not height or not gender or not body_type:
+            flash('All fields are required.', 'error')
+            return render_template('profile.html', title='Create Profile - WeatherAvatar')
+        
+        try:
+            height = int(height)
+            if height < 100 or height > 250:
+                flash('Height must be between 100-250 cm.', 'error')
+                return render_template('profile.html', title='Create Profile - WeatherAvatar')
+        except ValueError:
+            flash('Invalid height value.', 'error')
+            return render_template('profile.html', title='Create Profile - WeatherAvatar')
+        
+        # Check if profile already exists
+        existing_profile = UserProfile.query.filter_by(user_id=user_id).first()
+        
+        if existing_profile:
+            # Update existing profile
+            existing_profile.height = height
+            existing_profile.gender = gender
+            existing_profile.body_type = body_type
+            existing_profile.updated_at = db.func.now()
+        else:
+            # Create new profile
+            new_profile = UserProfile()
+            new_profile.user_id = user_id
+            new_profile.height = height
+            new_profile.gender = gender
+            new_profile.body_type = body_type
+            db.session.add(new_profile)
+        
+        try:
+            db.session.commit()
+            flash('Profile saved successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Error saving profile: {e}')
+            flash('Error saving profile. Please try again.', 'error')
+    
+    return render_template('profile.html', title='Create Profile - WeatherAvatar')
 
 
 @app.route('/mockups')

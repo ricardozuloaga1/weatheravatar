@@ -29,6 +29,23 @@ class WeatherData(db.Model):
         return f'<WeatherData {self.location} - {self.temperature}°>'
 
 
+class UserProfile(db.Model):
+    """Model to store user profile information"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
+    height = db.Column(db.Integer)  # Height in cm
+    gender = db.Column(db.String(20))  # male, female, non-binary, prefer-not-to-say
+    body_type = db.Column(db.String(20))  # slim, average, athletic, curvy
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = db.relationship('User', backref=db.backref('profile', uselist=False))
+    
+    def __repr__(self):
+        return f'<UserProfile {self.user_id} - {self.gender}/{self.body_type}>'
+
+
 class Avatar(db.Model):
     """Model to store avatar configurations"""
     id = db.Column(db.Integer, primary_key=True)
