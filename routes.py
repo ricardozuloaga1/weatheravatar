@@ -298,15 +298,38 @@ def api_weather_city(city):
 
 @app.route('/outfit')
 def outfit():
-    """Outfit recommendation route - placeholder for future mockup implementation"""
+    """Outfit recommendation route"""
     # Check if user is logged in
     if 'user_id' not in session:
         flash('Please log in to view outfit recommendations.', 'error')
         return redirect(url_for('login'))
     
-    # For now, redirect to dashboard
-    flash('Outfit recommendations coming soon!', 'info')
-    return redirect(url_for('dashboard'))
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('login'))
+    
+    # Get user profile
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    
+    if not profile:
+        flash('Please create your profile first.', 'info')
+        return redirect(url_for('profile'))
+    
+    # Get latest weather data for the user
+    latest_weather = WeatherData.query.order_by(WeatherData.timestamp.desc()).first()
+    
+    # If no weather data available, redirect to weather page
+    if not latest_weather:
+        flash('Please get weather data first to see outfit recommendations.', 'info')
+        return redirect(url_for('weather'))
+    
+    return render_template('outfit.html', 
+                         profile=profile, 
+                         weather=latest_weather, 
+                         title='Your Outfit - WeatherAvatar')
 
 
 @app.errorhandler(404)
