@@ -16,10 +16,7 @@ def index():
     return render_template('splash.html', title='Welcome to WeatherAvatar')
 
 
-@app.route('/dashboard')
-def dashboard():
-    """Main dashboard page for WeatherAvatar"""
-    return render_template('index.html', title='WeatherAvatar')
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -42,7 +39,7 @@ def login():
                 session['user_id'] = user.id
                 session['user_email'] = user.email
                 flash('Login successful!', 'success')
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('weather'))
             else:
                 flash('Invalid email or password.', 'error')
         
