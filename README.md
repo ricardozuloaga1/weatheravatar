@@ -1,162 +1,61 @@
 # WeatherAvatar
 
-A mobile-first Flask web application that generates personalized avatars with dynamic weather-based styling and outfit recommendations.
+A Flask app that turns the weather into a daily outfit, illustrated on a customizable full-body avatar.
 
-## Features
+## Daily outfit experience
 
-- **Dynamic Avatar Generation**: SVG-based avatars that adapt clothing based on current weather conditions
-- **Real-time Weather Integration**: Live weather data from OpenWeatherMap API
-- **Location Services**: GPS geolocation and manual city/ZIP code lookup
-- **Personalized Profiles**: User height, gender, and body type customization
-- **Weather-Adaptive Outfits**: Intelligent clothing suggestions based on temperature and conditions
-- **Mobile-First Design**: Responsive interface optimized for smartphones
-- **Dark Theme**: Modern Bootstrap-based UI with custom styling
+Open `/today` (also the destination of `/` and `/outfit`). No account or API key is needed to try it.
 
-## Tech Stack
+- Full-body vector avatar with facial features, four hair styles, five skin tones, four hair colors, three builds, and adjustable height.
+- Layered tees, button-downs, knits, overshirts, rain shells, insulated coats, shorts/trousers, sneakers/boots. Four coordinated color palettes.
+- Recommendations use hourly **apparent temperature**, rain probability/conditions, wind, personal warmth preference, and activity. Apparent temperature already includes environmental effects; wind is not subtracted a second time.
+- Choose the next twelve forecast hours or remaining morning/afternoon/evening hours. Elapsed periods are disabled. Weather uses the selected location's timezone.
+- Search and select a city, or explicitly request browser geolocation. Forecasts are returned directly for those coordinates, never read from another user's weather history.
+- Four clearly labeled sample forecasts support exploration without network access. Live forecast failures remain explicit rather than silently substituting sample data.
+- Avatar appearance is saved in this browser's local storage. Canceling the editor restores the previous appearance. The last selected location, comfort, activity, units, and palette are also saved locally; a returning visit refreshes the last location. Nothing is synced to an account.
 
-- **Backend**: Flask (Python)
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Frontend**: HTML5, CSS3, JavaScript
-- **UI Framework**: Bootstrap 5 with custom dark theme
-- **Icons**: Feather Icons
-- **Server**: Gunicorn WSGI server
-- **External APIs**: OpenWeatherMap
+This first iteration uses generic illustrated clothing. It does **not** implement a personal wardrobe, retailer catalogues, selfie generation, virtual try-on, or garment fit prediction. The original account/profile pages remain available but are not required for the new experience; their saved profiles do not sync with the browser avatar yet.
 
-## Installation
+## Run locally
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd weatheravatar
+Python 3.11+ and [uv](https://docs.astral.sh/uv/) are required.
+
+```sh
+uv sync
+# Use an isolated development database rather than the legacy tracked database.
+DATABASE_URL=sqlite:////tmp/weatheravatar-dev.db uv run flask --app main run --port 5074
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
+Open http://127.0.0.1:5074/today. Sample mode works immediately. Internet access is needed for live weather and optional Google Fonts; system font fallbacks are provided.
+
+Set `SESSION_SECRET` for any shared environment. Debug is off by default; set `FLASK_DEBUG=1` only for local development. For a deployed service, use Gunicorn, not Flask's development server.
+
+## Weather sources and endpoints
+
+New daily experience:
+
+- `GET /api/locations?q=Caracas`: Open-Meteo geocoding, up to five results for explicit location selection.
+- `GET /api/daily-weather?lat=10.5&lon=-66.9`: Open-Meteo current weather and two days of hourly forecasts. Celsius, km/h, and the location's local time.
+
+Weather attribution: [Open-Meteo](https://open-meteo.com/). The public endpoints are for noncommercial use; review [their pricing and usage terms](https://open-meteo.com/en/pricing) before a commercial release. Production hardening should add rate limits and caching keyed by coordinates. The endpoint currently makes a request per explicit location selection.
+
+Legacy weather endpoints still use `OPENWEATHER_API_KEY`. They are not used by the new daily view.
+
+## Validate
+
+```sh
+uv run python -m unittest discover -s tests -v
+node --test tests/outfit-engine.test.mjs
 ```
 
-3. Set up environment variables:
-```bash
-export DATABASE_URL="postgresql://username:password@localhost/weatheravatar"
-export SESSION_SECRET="your-secret-key-here"
-export OPENWEATHER_API_KEY="your-openweather-api-key"
-```
+Tests cover forecast input validation, provider failures, location isolation, cold/rain/heat/wind behavior, comfort and activity adjustments, and forecast windows crossing midnight.
 
-4. Initialize the database:
-```bash
-python -c "from app import app, db; app.app_context().push(); db.create_all()"
-```
+## Main files
 
-5. Run the application:
-```bash
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-```
+- `daily.py`: daily view and weather adapter.
+- `templates/daily.html`, `static/css/daily.css`: responsive daily interface.
+- `static/js/outfit-engine.mjs`: deterministic outfit selection and forecast windows.
+- `static/js/avatar.mjs`: vector avatar and garment layers.
+- `static/js/daily.mjs`: UI, location selection, and local appearance preferences.
 
-## Usage
-
-1. **Welcome**: Start at the splash screen
-2. **Sign Up/Login**: Create account or log in with existing credentials
-3. **Profile Setup**: Enter your height, gender, and body type preferences
-4. **Avatar Preview**: View and customize your personal avatar
-5. **Weather Check**: Allow location access or manually enter your city
-6. **Outfit Recommendations**: Get weather-appropriate clothing suggestions
-
-## API Endpoints
-
-- `GET /` - Splash screen landing page
-- `GET|POST /login` - User authentication
-- `GET|POST /profile` - Profile creation and editing
-- `GET /avatar` - Avatar preview and customization
-- `GET|POST /weather` - Weather selection interface
-- `GET /outfit` - Weather-based outfit recommendations
-- `GET /api/weather/coords/<lat>/<lon>` - Weather data by coordinates
-- `GET /api/weather/city/<city>` - Weather data by city name
-
-## Database Schema
-
-### Users Table
-- `id`: Primary key
-- `username`: Unique username
-- `email`: User email address
-- `password_hash`: Hashed password
-- `created_at`: Account creation timestamp
-
-### User Profiles Table
-- `id`: Primary key
-- `user_id`: Foreign key to users table
-- `height`: Height in centimeters
-- `gender`: Gender selection
-- `body_type`: Body type preference
-- `created_at`, `updated_at`: Timestamps
-
-### Weather Data Table
-- `id`: Primary key
-- `location`: Location name
-- `temperature`: Temperature in Celsius
-- `description`: Weather description
-- `humidity`: Humidity percentage
-- `wind_speed`: Wind speed
-- `timestamp`: Data retrieval time
-
-## Configuration
-
-### Required Environment Variables
-
-- `DATABASE_URL`: PostgreSQL connection string
-- `SESSION_SECRET`: Flask session secret key
-- `OPENWEATHER_API_KEY`: OpenWeatherMap API key
-
-### OpenWeatherMap API Setup
-
-1. Visit [OpenWeatherMap API](https://openweathermap.org/api)
-2. Create a free account
-3. Generate an API key
-4. Add the key to your environment variables
-
-## File Structure
-
-```
-weatheravatar/
-├── app.py              # Flask application factory
-├── main.py             # Application entry point
-├── models.py           # Database models
-├── routes.py           # URL routing and views
-├── requirements.txt    # Python dependencies
-├── templates/          # HTML templates
-│   ├── splash.html
-│   ├── login.html
-│   ├── profile.html
-│   ├── avatar.html
-│   ├── weather.html
-│   └── outfit.html
-├── static/            # Static assets
-│   ├── css/
-│   ├── js/
-│   └── assets/
-└── README.md          # This file
-```
-
-## Weather Logic
-
-The application uses intelligent logic to recommend outfits based on:
-
-- **Temperature ranges**: Different clothing for cold, mild, warm, and hot weather
-- **Weather conditions**: Rain gear for precipitation, sun protection for sunny days
-- **User profile**: Recommendations adapted to body type and preferences
-- **Seasonal factors**: Consideration of typical weather patterns
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For issues or questions, please create an issue in the GitHub repository.
+Next: user-owned garments and persistence, then optional selfie likeness. Keep outfit selection separate from rendering so both can evolve independently.

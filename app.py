@@ -25,8 +25,8 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 # Enable debug mode and logging
-app.debug = True
-logging.basicConfig(level=logging.DEBUG)
+app.debug = os.environ.get("FLASK_DEBUG") == "1"
+logging.basicConfig(level=logging.DEBUG if app.debug else logging.INFO)
 
 # initialize the app with the extension, flask-sqlalchemy >= 3.0.x
 db.init_app(app)
@@ -37,6 +37,9 @@ with app.app_context():
     
     # Import routes to register them with the app
     import routes  # noqa: F401
+
+    from daily import bp as daily_bp
+    app.register_blueprint(daily_bp)
 
     db.create_all()
 
