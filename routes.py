@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 @app.route('/')
 def index():
     """Splash screen landing page for WeatherAvatar"""
-    return render_template('splash.html', title='Welcome to WeatherAvatar')
+    return redirect(url_for('daily.today'))
 
 
 
@@ -295,44 +295,13 @@ def api_weather_city(city):
 
 @app.route('/outfit')
 def outfit():
-    """Outfit recommendation route"""
-    # Check if user is logged in
-    if 'user_id' not in session:
-        flash('Please log in to view outfit recommendations.', 'error')
-        return redirect(url_for('login'))
-    
-    user_id = session['user_id']
-    user = User.query.get(user_id)
-    
-    if not user:
-        flash('User not found.', 'error')
-        return redirect(url_for('login'))
-    
-    # Get user profile
-    profile = UserProfile.query.filter_by(user_id=user_id).first()
-    
-    if not profile:
-        flash('Please create your profile first.', 'info')
-        return redirect(url_for('profile'))
-    
-    # Get latest weather data for the user
-    latest_weather = WeatherData.query.order_by(WeatherData.timestamp.desc()).first()
-    
-    # If no weather data available, redirect to weather page
-    if not latest_weather:
-        flash('Please get weather data first to see outfit recommendations.', 'info')
-        return redirect(url_for('weather'))
-    
-    return render_template('outfit.html', 
-                         profile=profile, 
-                         weather=latest_weather, 
-                         title='Your Outfit - WeatherAvatar')
+    return redirect(url_for('daily.today'))
 
 
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
-    return render_template('404.html', title='Page Not Found - WeatherAvatar'), 404
+    return render_template('error.html', code=404, message='This page wandered off.'), 404
 
 
 @app.errorhandler(500)
@@ -340,7 +309,7 @@ def internal_error(error):
     """Handle 500 errors"""
     db.session.rollback()
     logger.error(f'Internal server error: {error}')
-    return render_template('500.html', title='Server Error - WeatherAvatar'), 500
+    return render_template('error.html', code=500, message='Something went wrong. Please try again.'), 500
 
 
 # Context processor to make common variables available in all templates
